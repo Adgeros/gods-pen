@@ -3,7 +3,7 @@
     <div v-if='info'>
       <div class="title">
         <div class="icon">
-          <img :src="getIcon(info)" alt="">
+          <img @error="imgError($event)" :src="getIcon(info)" alt="">
         </div>
         <div class="info">
           <div class="name">{{info.name}}</div>
@@ -136,7 +136,6 @@
     },
     created: function () {
       this.ema.bind('widgetComponentInfo.selectOne', data => {
-        console.log('this.$parent', this.$parent)
         this.ema.fire('dock.panelActive', 'widgetComponentInfo')
         this.info = data
         this.loadMd(data)
@@ -147,8 +146,13 @@
     },
     methods: {
       getIcon: function (params) {
-        let url = params.path.replace(/index.js$/, 'icon.png')
+        let url = params.path.replace(/index.js$/, 'cover.png')
         return url
+      },
+      imgError (ev = {}) {
+        const target = ev.target || {}
+        const src = target.src
+        if (/cover.png$/.test(src)) target.src = src.replace(/cover.png$/, 'icon.png')
       },
       loadMd: function (com) {
         let url = com.path.replace(/index.js$/, 'README.md')

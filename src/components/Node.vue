@@ -4,9 +4,13 @@
     @click.stop='actived' @contextmenu.prevent.stop="showContextMenu(nodeInfo,$event)"
     :class="{active:isActive,dragentered:dragentered}"
     :style="computedStyle">
-    <component :is="currPage" v-bind="nodeInfo.props" :ref="nodeInfo.id" :style="componentStyle"></component>
-    <selecter ref='selector' :is-root='isRootNode' :visible="isActive" :warpStyle="nodeInfo.style"></selecter>
-    <template v-if="nodeInfo.child">
+    <component :is="currPage" v-bind="nodeInfo.props" :ref="nodeInfo.id" :style="componentStyle">
+      <template v-if="nodeInfo.child && !(slots === false)">
+        <node :slot-style='slots(index) && slots(index).style' :slot="slots(index) && slots(index).name" v-for="(item,index) in nodeInfo.child" :node-index='index' :stacked='nodeInfo.stack' :key="item.id" :info="item"></node>
+      </template>
+    </component>
+    <selecter ref='selector' :packed='packed' :is-root='isRootNode && !nodeInfo.packed' :visible="isActive" :warpStyle="nodeInfo.style"></selecter>
+    <template v-if="nodeInfo.child && (slots === false)">
       <node v-for="(item,index) in nodeInfo.child" :node-index='index' :stacked='nodeInfo.stack' :key="item.id" :info="item"></node>
     </template>
     <div :style="{width: phoneSize.width}" :class="{hover: dragenteredDivider}" class="node-divider" @dragleave="dragleaveDivider" @dragover="dragoverDivider" @dragenter='dragenterDivider' @drop="dropDivider" v-if="!stacked && !fixed"></div>
@@ -20,20 +24,29 @@
     position: relative;
     cursor: pointer;
     user-select: none;
-    font-size 16px;
+    font-size: 16px;
+
+    // 防止 relative 子元素 margin 穿透
+    &::before {
+      content: ''
+      display: block;
+      overflow: hidden;
+      height: 0;
+      width: 1px;
+    }
 
     &.active {
-      outline: 2px dashed #ff3c3c;
+      // outline: 1px dashed #faad14;
       // box-shadow: inset rgba(102, 88, 88, 0.43) 0px 0px 10px 0px;
     }
 
     &.dragentered {
-      outline: 2px dashed #ff3c3c;
+      outline: 1px dashed #faad14;
       box-shadow: rgba(102, 88, 88, 0.43) 0px 0px 10px 3px;
     }
 
     &.mouseovered {
-      // outline: 1px dotted red;
+      outline: 1px dotted #faad14;
       // box-shadow: rgba(102, 88, 88, 0.43) 0px 0px 10px 3px;
     }
 
@@ -44,17 +57,20 @@
       font-size: 12px;
       color: #dddddd;
     }
+
     > .node-divider {
       height: 10px;
-      position absolute;
+      position: absolute;
       left: 0;
       top: -5px;
+
       &.hover {
-        background rgba(255,0,0,0.5);
+        background: rgba(255, 0, 0, 0.5);
       }
     }
+
     > .type-icon {
-      position absolute;
+      position: absolute;
       right: 2px;
       top: 2px;
       width: 10px;
@@ -70,9 +86,9 @@
   import BaseNode from 'src/extend/BaseNode'
   import Selecter from './Selecter'
   import cloneDeep from 'lodash/cloneDeep'
-  import {getBaseNode} from 'src/extend/Util'
+  import Util from 'src/extend/Util'
   import Vue from 'vue'
-  import {modifyNodeId, toSafeNumber} from '../assets/js/common'
+  import {modifyNodeId, toSafeNumber, componentAddJudge, confirmWithGoodbye} from '../assets/js/common'
   export default {
     mixins: [BaseNode, BaseComponent],
     name: 'node',
@@ -88,29 +104,28 @@
       },
       nodeIndex: {
         type: Number,
+      },
+      slotStyle: {
+        type: Object,
+        default: null
       }
     },
     data: function () {
       return {
         dragenteredDivider: false,
-        componentStyle: {
-          'pointer-events': 'auto'
-        },
+        componentEvents: 'auto',
         canDraged: false,
         oldId: '',
         isActive: false, // 是否被选中
         dragentered: false, // 拖动进入
         mouseovered: false,
-        currPage: ''
+        currPage: '',
+        slots: false
       }
     },
     watch: {
-      'isActive': function (newVal) {
-        if (newVal) {
-          this.componentStyle['pointer-events'] = 'none'
-        } else {
-          this.componentStyle['pointer-events'] = 'audo'
-        }
+      'isActive': function (val) {
+        this.componentEvents = val ? 'auto' : 'none'
       },
       'nodeInfo.type': function (newVal, oldVal) {
         this.nodeInfo.props = {}
@@ -177,6 +192,11 @@
       phoneSize () {
         return this.$store.state.setting.phoneSize
       },
+      componentStyle () {
+        return {
+          'pointer-events': this.packedChild ? 'none' : this.componentEvents
+        }
+      },
       visible: {
         // getter
         get: function () {
@@ -190,6 +210,13 @@
         set: function (newValue) {
           this.nodeInfo.visible = newValue
         }
+      },
+      packedChild () {
+        if (this.isRootNode) return false
+        return this.parentNodeVm.packed || this.parentNodeVm.packedChild
+      },
+      packed () {
+        return !this.isRootNode && this.nodeInfo.packed
       }
     },
     beforeDestroy: function () {
@@ -238,10 +265,54 @@
        * 绑定选中节点运行动画
        */
       bindRunAnimation: function () {
-        this.ema.bind('select.runAnimation', id => {
-          if (id != this.nodeInfo.id) {
+        this.ema.bind('animate.timeline.move', (time, alltime) => {
+          if (this.nodeInfo.animate.length > 0 && this.isVisible(this)) {
+            this.setAnimationFrame(time, alltime)
           }
         })
+        this.ema.bind('animate.timeline.move.end', ev => {
+          if (this.nodeInfo.animate.length > 0) {
+            this.$el.style.animation = ''
+          }
+        })
+      },
+      setAnimationFrame (time, alltime) {
+        let animates = this.nodeInfo.animate
+        let currentAnimation = null
+        let timeLine = 0
+        let infinitePreTimeLine = 0
+        for (let index = 0; index < animates.length; index++) {
+          const val = animates[index]
+          if (val.infinite) {
+            infinitePreTimeLine = timeLine
+            timeLine = alltime
+            currentAnimation = val
+            break
+          }
+          timeLine += val.duration * val.countNum + val.delay
+          if (timeLine >= time) {
+            currentAnimation = val
+            break
+          }
+        }
+
+        if (!currentAnimation) {
+          return
+        }
+        let duration = currentAnimation.duration
+        let timingFunction = currentAnimation.timingFunction || 'ease'
+        let delay = ((timeLine - time) - currentAnimation.duration * currentAnimation.countNum) % currentAnimation.duration
+        let count = 1
+        if (currentAnimation.infinite) {
+          delay = -((time - infinitePreTimeLine - currentAnimation.delay)) % currentAnimation.duration
+        }
+        let name = currentAnimation.type
+        let animation = `${duration}s ${timingFunction} ${delay}s ${count} normal none paused ${name}`
+        if (name) {
+          this.$el.style.animation = animation
+        } else {
+          this.$el.style.animation = ''
+        }
       },
       /**
        * 绑定选中一个节点事件
@@ -285,7 +356,7 @@
               })
             }, 200)
             // 对page容器特殊处理
-            var parent = this.$parent
+            var parent = this.parentNodeVm
             if (parent && parent.nodeInfo && parent.nodeInfo.type.indexOf('PageContainer') != -1) {
               this.ema.fire('select.truckPageContainer', id)
             }
@@ -320,14 +391,14 @@
         // 绑定被选中事件。确保只有一个元素被激活
         this.ema.bind('node.copy', node => {
           if (!node || !node.id || node.id != this.nodeInfo.id) return
-          this.$parent.copyChild(this.nodeInfo, {})
+          this.parentNodeVm.copyChild(this.nodeInfo, {})
         })
       },
       /**
        * 对page容器绑定，选择page下面的直接孩子的时候，其他孩子隐藏掉
        */
       bindPageContainerSelect: function () {
-        var parent = this.$parent
+        var parent = this.parentNodeVm
         if (parent && parent.nodeInfo && parent.nodeInfo.type.indexOf('PageContainer') != -1) {
           this.ema.bind('select.truckPageContainer', id => {
             if (id != this.nodeInfo.id) {
@@ -346,15 +417,25 @@
           return
         }
         let component = await cLoader.load(this.nodeInfo)
+        // slots
+        this.slots = this.calcSlots(component, this.nodeInfo.props)
         let type = this.nodeInfo.type
         // 如果有label（用户设置 || getbasenode设置 || 这里设置）保留，否则从component配置对象获取，否则用id
-        that.$set(that.info, 'label', that.info.label ? that.info.label : that.info.id.replace(type, component.label || type))
-        // stack 模式 显式设置为false才是false
-        that.$set(that.info, 'stack', typeof that.info.stack === 'boolean' ? that.info.stack : component.stack !== false)
+        that.$set(that.info, 'label', that.info.label ? that.info.label : that.info.id.replace(type, (component && component.label) || type))
+        that.$set(that.info, 'stack', (() => {
+          // 设置过了
+          if (typeof that.info.stack === 'boolean') return that.info.stack
+          // 布局组件 显式设置为 true 才是 true
+          if (this.slots) return component.stack === true
+          // 非布局组件 显式设置为 false 才是 false, 楼层模式
+          else return component.stack !== false
+        })())
         // 子组件限额
         that.$set(that.info, 'childLimit', typeof that.info.childLimit === 'number' ? that.info.childLimit : toSafeNumber(component.childLimit, 9999))
         // 叶子节点
         that.$set(that.info, 'leaf', typeof that.info.leaf === 'boolean' ? that.info.leaf : !!component.leaf || String(component.childLimit) === '0')
+        // 封装 packed
+        that.$set(that.info, 'packed', that.info.packed === true)
         var style
         if (that.info.style && JSON.stringify(that.info.style) != '{}') {
           // 已经设置过样式了
@@ -389,6 +470,7 @@
         if (id === 'root' && !window.$vue) {
           this.ema.fire('select.one', this.nodeInfo.id)
         }
+        this.bindCalcSlot()
       },
       bindReload: function () {
         this.ema.bind('component.reload', id => {
@@ -414,12 +496,14 @@
       mouseover: function () {
       },
       mouseenter: function (e) {
+        if (this.packedChild) return
         this.mouseovered = true
-        this.componentStyle['pointer-events'] = 'none'
+        this.componentEvents = 'none'
       },
       mouseout: function (e) {
+        if (this.packedChild) return
         this.mouseovered = false
-        this.componentStyle['pointer-events'] = 'auto'
+        this.componentEvents = 'auto'
       },
       /**
        * ==============拖动元素相关===============
@@ -429,10 +513,11 @@
        * @augments
        */
       actived: function (keepContextMenu) {
+        if (this.packedChild) return
         // 通知所有节点被选中的是谁
         console.log('actived....', keepContextMenu, this.nodeInfo)
         if (this.nodeInfo.lock) {
-           this.$message({type: 'warning', message: '已被锁定，请先解锁'})
+          this.$message({type: 'warning', message: '已被锁定，请先解锁'})
         } else {
           this.ema.fire('select.one', this.nodeInfo.id, keepContextMenu)
         }
@@ -464,14 +549,14 @@
       dropDivider: function (ev) {
         ev.stopPropagation()
         ev.preventDefault()
-        var parentNode = this.$parent.nodeInfo
+        var parentNode = this.parentNodeVm.nodeInfo
         console.log('drop', ev)
         this.dragenteredDivider = false
         this.dragentered = false
         // 添加新的组件内容
         var componentInfo = JSON.parse(ev.dataTransfer.getData('componentInfo'))
         if (componentInfo.name) {
-          var nodeInfo = getBaseNode(componentInfo)
+          var nodeInfo = Util.getBaseNode(componentInfo)
           parentNode.child.splice(this.nodeIndex, 0, nodeInfo)
           this.$nextTick(() => {
             this.ema.fire('select.one', nodeInfo.id)
@@ -498,8 +583,8 @@
         ev.stopPropagation()
         ev.preventDefault()
         this.dragentered = false
-        if (this.nodeInfo.leaf) return this.$alert('不能为目标节点添加子组件')
-        if (this.nodeInfo.childLimit && this.nodeInfo.child && this.nodeInfo.child.length >= this.nodeInfo.childLimit) return this.$alert(`目标节点最多可添加${this.nodeInfo.childLimit}个子组件，已达限额`)
+        let judge = componentAddJudge(this.nodeInfo, this)
+        if (!judge.can) return this.$alert(judge.msg)
         // 对孩子数组进行初始化
         if (!this.nodeInfo.child) {
           this.$set(this.nodeInfo, 'child', [])
@@ -534,7 +619,7 @@
           // 添加新的组件内容
           var componentInfo = JSON.parse(ev.dataTransfer.getData('componentInfo'))
           if (componentInfo.name) {
-            var nodeInfo = getBaseNode(componentInfo)
+            var nodeInfo = Util.getBaseNode(componentInfo)
             // 暂时不添加left top 到style
             nodeInfo.forceStyle = {
               left: targetPos.left,
@@ -578,28 +663,32 @@
         }
       },
       copyChild: function (node, {isJson, keepPos}) {
-        console.log('copyChild')
-        if (!this.nodeInfo.child) {
-          this.$set(this.nodeInfo, 'child', [])
+        let judge = componentAddJudge(this.nodeInfo, this)
+        if (!judge.can) return this.$alert(judge.msg)
+        if (!this.nodeInfo.child) this.$set(this.nodeInfo, 'child', [])
+        var cloneNodes = !isJson ? cloneDeep(node) : JSON.parse(node)
+        if (!(cloneNodes instanceof Array)) cloneNodes = [ cloneNodes ]
+        for (let cloneNode of cloneNodes) {
+          var childs = this.nodeInfo.child
+          var left
+          var top
+          var unit
+          var isAbsolute = cloneNode.style.position === 'absolute'
+          if (!keepPos && cloneNode.style.left) {
+            left = parseInt(cloneNode.style.left)
+            unit = String(cloneNode.style.left).replace(/^[-\d.]+/, '')
+            cloneNode.style.left = left + (!isAbsolute ? '' : unit == '%' ? 2 : 20) + unit
+          }
+          if (!keepPos && cloneNode.style.top) {
+            top = parseInt(cloneNode.style.top)
+            unit = String(cloneNode.style.top).replace(/^[-\d.]+/, '')
+            cloneNode.style.top = top + (!isAbsolute ? '' : unit == '%' ? 2 : 20) + unit
+          }
+          // randomid
+          cloneNode = modifyNodeId(cloneNode, Object.keys(window.$_nodecomponents || {}))
+          childs.push(cloneNode)
         }
-        var childs = this.nodeInfo.child
-        var cloneNode = !isJson ? cloneDeep(node) : JSON.parse(node)
-        var left
-        var top
-        var unit
-        if (!keepPos && cloneNode.style.left) {
-          left = parseInt(cloneNode.style.left)
-          unit = String(cloneNode.style.left).replace(/^[-\d.]+/, '')
-          cloneNode.style.left = left + (unit == '%' ? 2 : 20) + unit
-        }
-        if (!keepPos && cloneNode.style.top) {
-          top = parseInt(cloneNode.style.top)
-          unit = String(cloneNode.style.top).replace(/^[-\d.]+/, '')
-          cloneNode.style.top = top + (unit == '%' ? 2 : 20) + unit
-        }
-        // randomid
-        cloneNode = modifyNodeId(cloneNode, Object.keys(window.$_nodecomponents || {}))
-        childs.push(cloneNode)
+        this.$nextTick(() => this.ema.fire('tree.filter'))
         console.log('childs', childs)
       },
       copyStyle () {
@@ -613,6 +702,29 @@
       },
       isNodeRegisted (tag) {
         return Boolean(Vue.component(tag))
+      },
+      async openPacked ({ notice = true, scene = 'db_click_node' }) {
+        const valid = notice ? await confirmWithGoodbye('确定要对当前节点「解除封装」吗？', `openPacked_${scene}`).catch(e => false) : true
+        if (!valid) return console.log('取消解除节点封装')
+        this.nodeInfo.packed = false
+        this.ema.fire('tree.filter')
+      },
+      async doPack ({ notice = true, scene = 'db_click_node' }) {
+        const valid = notice ? await confirmWithGoodbye('确定要对当前节点执行「封装」操作吗？', `doPack_${scene}`).catch(e => false) : true
+        if (!valid) return console.log('取消执行节点封装')
+        this.nodeInfo.packed = true
+        this.ema.fire('tree.filter')
+      },
+      bindCalcSlot () {
+        const component = Vue.component(this.nodeInfo.id)
+        if (!component) return
+        const options = component && component.options || {}
+        const slotfn = options.slots
+        if (typeof slotfn !== 'function') return
+        var that = this
+        this.$watch('nodeInfo.props', function (val) {
+          that.slots = that.calcSlots(options, val)
+        }, { deep: true })
       }
     }
   }

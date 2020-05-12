@@ -1,12 +1,30 @@
 <template>
   <div class="mycomponents">
     <div class="box-search">
-      <el-input size="mini" placeholder="输入搜索关键字..." @keyup.enter.native="search()" v-model="searchKey" style="width: 98%;">
-        <el-select class="type-select" size="mini" style="width: 74px;" v-model="searchType" slot="prepend" placeholder="请选择">
+      <el-input
+        size="mini"
+        placeholder="输入搜索关键字..."
+        @keyup.enter.native="search()"
+        v-model="searchKey"
+        style="width: 98%;"
+      >
+        <el-select
+          class="type-select"
+          size="mini"
+          style="width: 74px;"
+          v-model="searchType"
+          slot="prepend"
+          placeholder="请选择"
+        >
           <el-option label="全部" :value="1"></el-option>
           <el-option label="自建" :value="2"></el-option>
         </el-select>
-        <i class="el-icon-close el-input__icon" style="color:#999;cursor: pointer;" slot="suffix" @click="searchKey = ''"></i>
+        <i
+          class="el-icon-close el-input__icon"
+          style="color:#999;cursor: pointer;"
+          slot="suffix"
+          @click="searchKey = ''"
+        ></i>
         <el-button slot="append" @click.stop="search()" icon="el-icon-search"></el-button>
       </el-input>
       <el-dropdown class="component-menu" @command="handlePointMenu">
@@ -16,35 +34,47 @@
           <el-dropdown-item command="card">卡片</el-dropdown-item>
         </el-dropdown-menu>
       </el-dropdown>
-      <assets-tags @selectchange="onTagSelect" :assets-id='categoryId'></assets-tags>
+      <assets-tags @selectchange="onTagSelect" :assets-id="categoryId"></assets-tags>
     </div>
     <div class="components" :class="[comListsStyle]">
-      <div class="com-item" v-for="com in comLists" :key="com.id" @dragstart="dragstart($event,com)" draggable="true" @click="addOne(com)">
+      <div
+        class="com-item"
+        v-for="com in comLists"
+        :key="com.id"
+        @dragstart="dragstart($event,com)"
+        draggable="true"
+        @click="addOne(com)"
+      >
         <div class="com-item-avatar">
-          <img :src="com.path | componentIcon" class="icon-img">
+          <img @error="imgError($event)" :src="com.path | componentIcon" class="icon-img" />
         </div>
         <div class="com-item-content">
           <p class="com-item-name">{{com.name}}</p>
           <p class="com-item-desc" @click.stop="readme(com)">{{com.desc}}</p>
           <p class="com-item-count">
-            <i class="iconfont icon-download"></i> {{com.useNumber || 0}}</p>
+            <i class="iconfont icon-download"></i>
+            {{com.useNumber || 0}}
+          </p>
         </div>
       </div>
+
+      <a @click="goShop" class="addComponent">添加组件</a>
     </div>
   </div>
 </template>
 
 <style lang="stylus" rel="stylesheet/stylus" type="text/stylus">
-.mycomponents {
-  .box-search {
-    .el-input__suffix {
-      transform: translateX(-55px) !important;
+  .mycomponents {
+    .box-search {
+      .el-input__suffix {
+        transform: translateX(-55px) !important;
+      }
+    }
+
+    .type-select .el-input__suffix {
+      transform: none !important;
     }
   }
-  .type-select .el-input__suffix {
-    transform: none !important;
-  }
-}
 </style>
 
 <style lang="stylus" rel="stylesheet/stylus" scoped type="text/stylus">
@@ -81,11 +111,23 @@
       padding-bottom: 5px;
       padding-top: 5px;
 
+      .addComponent {
+        text-align: center;
+        padding: 10px;
+        clear: both;
+        float: none;
+        display: block;
+        color: #faad14;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
       .com-item {
         position: relative;
         height: 50px;
         padding: 0 10px;
         display: flex;
+
         &:hover {
           background-color: #6081bd33;
           cursor: pointer;
@@ -131,7 +173,7 @@
             overflow: hidden;
 
             &:hover {
-              color #3899ec
+              color: #3899ec;
             }
           }
 
@@ -139,7 +181,7 @@
             position: absolute;
             right: 10px;
             top: 3px;
-            color: #1163ad;
+            color: #00a5e0;
             font-size: 12px;
             transform: scale(0.8);
 
@@ -152,23 +194,34 @@
 
       &.card {
         .com-item {
-          width: 80px;
-          height: 100px;
+          width: 118px;
+          height: 118px;
           overflow: hidden;
           display: block;
-          border 1px solid #505152
+          border: 1px solid #505152;
           box-shadow: 0 0 6px 0 rgba(22, 45, 61, 0.27);
           float: left;
-          margin-left: 5px;
+          margin-left: 8px;
           margin-bottom: 8px;
-          padding: 0 5px;
+          padding: 0;
           text-align: center;
           border-radius: 5px;
+          display block
+          position relative
 
           .com-item-avatar {
-            margin: 16px auto 5px;
-            width: 40px;
-            height: 40px;
+            margin 0
+            width: 100%;
+            height: 100%;
+            img {
+              width: 100%;
+              height: 100%;
+              max-width 100%;
+              max-height 100%;
+              object-fit contain
+              object-position center center
+              vertical-align top
+            }
           }
 
           .com-item-name {
@@ -181,10 +234,20 @@
             height: auto;
 
             .com-item-desc {
+              position absolute
+              bottom 0
+              left 0
+              right 0
               text-align: center;
               white-space: pre-line;
-              line-height: 14px;
-              height: 29px;
+              line-height: 1.3;
+              padding 10px 10px;
+              background-color: rgba(0,0,0,0.5);
+              margin: 0;
+              color: #fff;
+              &:hover {
+                color: #f9bf4d;
+              }
             }
 
             .com-item-count {
@@ -212,11 +275,11 @@
     name: 'Components',
     components: {AssetsTags},
 
-props: {
+    props: {
     },
     filters: {
       componentIcon: function (path) {
-        return !path ? 'https://imagecdn.ymm56.com/ymmfile/explore-biz/ymm_1527843621175.png' : path.replace(/index.js$/, 'icon.png')
+        return !path ? 'https://imagecdn.ymm56.com/ymmfile/explore-biz/ymm_1527843621175.png' : path.replace(/index.js$/, 'cover.png')
       }
     },
     data: function () {
@@ -254,8 +317,14 @@ props: {
     },
     mounted () {
       this.search()
+      this.ema.bind('components.refresh', this.search)
     },
     methods: {
+      imgError (ev = {}) {
+        const target = ev.target || {}
+        const src = target.src
+        if (/cover.png$/.test(src)) target.src = src.replace(/cover.png$/, 'icon.png')
+      },
       onTagSelect (tags) {
         this.selectedTags = tags
         this.search()
@@ -293,6 +362,9 @@ props: {
       },
       readme (com) {
         this.ema.fire('widgetComponentInfo.selectOne', com)
+      },
+      goShop () {
+        this.ema.fire('dock.panelActive', 'widgetShop')
       },
       handlePointMenu (type) {
         this.comListsStyle = type

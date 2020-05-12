@@ -9,7 +9,7 @@
     <!-- 弹出框 -->
     <c-dialogs></c-dialogs>
     <div :data-clipboard-text="clipboardContent" style="width:0;height:0;" ref="clipboard"></div>
-    <upload-image ref="screenshot"></upload-image>
+    <upload-image :h2c="{scale:1}" skip-size-check ref="screenshot" :key="screenshotKey" v-if="screenshotKey!=null" ></upload-image>
     <bughd></bughd>
   </div>
 </template>
@@ -30,7 +30,7 @@
   import Clipboard from 'clipboard'
   import Tips from './components/Tips'
   import myheader from './components/Header'
-  import { mapState } from 'vuex'
+  import {mapState} from 'vuex'
   require('src/extend/filter')
   let config = require('./config/index.js')
 
@@ -40,6 +40,7 @@
     components: {CDialogs, UploadImage, ContextMenu, UiDock, Tips, myheader, Bughd},
     data: function () {
       return {
+        screenshotKey: null,
         layoutData: null,
         nodeInfo: null,
         pageInfo: null,
@@ -120,12 +121,25 @@
       },
       autoSave: function () {
         setInterval(() => {
-          this.ema.fire('pageInfo.save', true)
+          this.ema.fire('pageInfo.save')
         }, 1000 * 60 * 2)
       },
       canDrag: function () {
       },
       bindEvent: function () {
+        // loading
+        let $loading
+        this.ema.bind('loading.show', () => {
+          $loading = this.$loading({
+            lock: true,
+            text: '处理中，请稍等',
+            spinner: 'el-icon-loading',
+            background: 'rgba(0, 0, 0, 0.7)'
+          })
+        })
+        this.ema.bind('loading.hide', () => {
+          $loading && $loading.close()
+        })
         var me = this
         // 监控内容变化。做持久化
         this.$watch('nodeInfo', (content) => {
@@ -160,23 +174,11 @@
           }
         })
         // 保存页面
-        this.ema.bind('pageInfo.save', (fast) => {
+        this.ema.bind('pageInfo.save', (fast, callback) => {
           console.log('save---------', this.nodeInfo)
           this.doSave(this.nodeInfo, true)
-          if (this.demoMode) return this.$alert('您处在 demo 模式下，不能保存数据哦')
-          if (fast) {
-            this.savePage()
-          } else {
-            this.openDialog({
-              name: 'd-savePageOrTemplate',
-              data: {
-                title: '页面保存',
-                saveType: 1,
-                pageInfo: Object.assign({}, this.pageInfo)
-              },
-              methods: {}
-            })
-          }
+          // if (this.demoMode) return this.$alert('您处在 demo 模式下，不能保存数据哦')
+          this.savePage(fast, callback)
         })
         // 绑定组件点击添加组件到根元素
         this.ema.bind('commponent.addOne', menu => {
@@ -184,9 +186,9 @@
           if (window.$vue && window.$vue.nodeInfo) {
             selectNode = window.$vue.nodeInfo
           }
-          if (selectNode.leaf) return this.$alert('不能为当前选中节点添加子组件')
-          if (selectNode.childLimit && selectNode.child && selectNode.child.length >= selectNode.childLimit) return this.$alert(`当前选中节点最多可添加${selectNode.childLimit}个子组件，已达限额`)
           var nodeInfo = getBaseNode(menu)
+          let judge = common.componentAddJudge(selectNode, window.$vue || this)
+          if (!judge.can) return this.$alert(judge.msg)
           // 如果给page容器添加孩子元素。孩子元素需要占满全屏
           if ((/pageContainer$/i).test(selectNode.type)) {
             nodeInfo.forceStyle = {
@@ -202,15 +204,33 @@
           }
           selectNode.child.push(nodeInfo)
         })
-        // 保存模板
-        this.ema.bind('pageInfo.saveTemp', () => {
+         // psd解析
+        this.ema.bind('pageInfo.psd', ({asService = false, url = '', name = '', root} = {}) => {
+          console.log('pageInfo.psd', this.nodeInfo)
+          root = root || this.nodeInfo.id
           this.openDialog({
-            name: 'd-savePageOrTemplate',
+            name: 'd-psd',
             data: {
-              title: '模板保存',
-              saveType: 2,
+              asService,
+              psdUrl: url,
+              psdName: name,
+              root,
+              title: 'psd上传'
             },
-            methods: {}
+            methods: {
+              changeNode: function (content, psdString) {
+                console.log('changeNode')
+                var nodes = null
+                try {
+                  nodes = JSON.parse(content)
+                } catch (error) {
+                  console.log('error', error)
+                }
+                if (!nodes) return console.log('图层解析失败')
+                const $root = window.$_nodecomponents[root]
+                $root.copyChild(nodes, {isJson: false, keepPos: 1})
+              }
+            }
           })
         })
         // 复制事件
@@ -228,6 +248,7 @@
         })
         // 截图服务
         this.ema.bind('screenshot', (el, options, callback, needLoading = true) => {
+          this.screenshotKey = Math.random().toFixed(10)
           let loading = needLoading && this.$loading({
             lock: true,
             text: '稍等片刻',
@@ -236,6 +257,7 @@
             this.$refs['screenshot'].upload(el, options, function () {
               loading && loading.close()
               callback.apply(null, arguments)
+              this.screenshotKey = null
             })
           }, 100) // 不加延时加载,loading效果不能立即触发
         })
@@ -385,7 +407,7 @@
       saveToServer: function () {
         this.ema.fire('pageInfo.save')
       },
-      savePage () {
+      savePage (fast, callback) {
         if (this.demoMode) return this.$alert('您处在demo模式下，不能保存数据哦')
         var info = Object.assign({}, this.pageInfo)
         info.content = window.localStorage.getItem(this.STORAGE_KEY)
@@ -400,9 +422,30 @@
           let msg = data.msg
           if (code == 500) return this.$alert(msg)
           this.$message({type: 'success', message: '保存成功'})
+          callback && callback()
+          if (!fast) {
+            this.savePagePreviewImage()
+          }
         }).catch((respond) => {
           this.$message({type: 'success', message: '保存失败'})
         })
+      },
+      savePagePreviewImage () {
+        var urlInfo = common.parseURL(window.location.href)
+        this.ema.fire('screenshot', document.querySelector('#stage'), {height: 486, fileName: urlInfo.params.key + '.jpg'}, (src) => {
+          console.log('screenshot', src)
+          var info = Object.assign({}, this.pageInfo)
+          info.content = window.localStorage.getItem(this.STORAGE_KEY)
+          info.image = src
+          Server({
+            url: 'editor/pages/save',
+            method: 'post', // default
+            needLoading: false,
+            data: info
+          }).then(({data}) => {
+          }).catch((respond) => {
+          })
+        }, false)
       },
       async publish () {
         if (this.demoMode) return this.$alert('您处在 demo 模式下，不能保存数据哦')
@@ -442,7 +485,7 @@
 <style lang="stylus" rel="stylesheet/stylus" type="text/stylus">
   @require 'assets/style/base.styl';
   @require 'assets/style/m-1px.styl';
-  @import url('//at.alicdn.com/t/font_503463_ot9w6051le.css');
+  @import url('//at.alicdn.com/t/font_503463_iuhwl9258d.css');
 
   normalize();
 
@@ -481,9 +524,8 @@
   }
 
   // .el-tabs__item {
-  //   float: left;
+  // float: left;
   // }
-
   .editorWarp {
     width: 100%;
     height: 100%;
@@ -520,9 +562,9 @@
       }
     }
 
-    .el-form-item--mini.el-form-item, .el-form-item--small.el-form-item {
-      margin-bottom: 3px;
-    }
+    // .el-form-item--mini.el-form-item, .el-form-item--small.el-form-item {
+    //   margin-bottom: 3px;
+    // }
   }
 
   .footer {
@@ -574,54 +616,65 @@
       margin: 5px;
     }
   }
+
   .el-tabs__header {
     .el-tabs__nav-wrap {
       .el-tabs__nav-next, .el-tabs__nav-prev {
-        line-height 29px;
+        line-height: 29px;
       }
+
       &.is-scrollable {
-        padding 0 16px;
+        padding: 0 16px;
       }
     }
   }
+
   .ui-dock-panel > div > .el-tabs__header {
     padding-right: 22px;
-    box-shadow inset 0 -1px 1px 0px #000
+    box-shadow: inset 0 -1px 1px 0px #000;
   }
+
   .ui-dock-panel {
     .el-tabs--border-card > .el-tabs__header {
-      border-bottom none
+      border-bottom: none;
     }
+
     .el-tabs--border-card > .el-tabs__header .el-tabs__item {
-    border none
+      border: none;
     }
+
     .el-tabs__nav-wrap {
-      margin-bottom 0
+      margin-bottom: 0;
     }
   }
+
   .editorWarp {
     .el-collapse-item__wrap {
       border-bottom: 1px solid #000000;
       box-shadow: 0 2px 1px -2px #fff;
     }
+
     .el-collapse-item__header {
       border-bottom: 1px solid #000000;
       box-shadow: 0 2px 1px -2px #fff;
+
       &.is-active {
-        border-bottom-color: transparent
-        box-shadow: none
+        border-bottom-color: transparent;
+        box-shadow: none;
       }
     }
+
     .el-collapse {
-      border: none
+      border: none;
     }
+
     .el-input__inner {
-      box-shadow: 1px 1px 1px 0px rgba(0,0,0,0.6);
+      box-shadow: 1px 1px 1px 0px rgba(0, 0, 0, 0.6);
     }
+
     .el-tabs__nav-wrap::after {
       background-color: #000000;
       box-shadow: inset 1px -3px 0px -2px #656565;
     }
   }
-
 </style>
