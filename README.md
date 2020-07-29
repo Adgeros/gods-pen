@@ -32,7 +32,7 @@
 
 ## 码良现状
 
-码良发布于2018年3月初，截止2020年13月目前已经支撑运满满**3500**多个活动页面。期间也得到了很多反馈、建议，以及 Bug 报告，基于此，我们持续迭代，致力于提升操作效率，打磨用户体验。道阻且长，仍需努力。目前你在官网上体验的所有能力 完全开源开放。
+码良发布于2018年3月初，截止2020年7月目前已经支撑运满满**4100**多个活动页面。期间也得到了很多反馈、建议，以及 Bug 报告，基于此，我们持续迭代，致力于提升操作效率，打磨用户体验。道阻且长，仍需努力。目前你在官网上体验的所有能力 完全开源开放。
 
 ## 支持功能
 1. 编辑器
@@ -170,7 +170,7 @@ npm run client:build
 
 ### 你可以打赏我们 :coffee: 来杯咖啡 :coffee:
 
-<img src="https://ymm-maliang.oss-cn-hangzhou.aliyuncs.com/ymm-maliang/resource/ymm_1572852703575.jpeg" width="350px">
+<img src="https://ymm-maliang.oss-cn-hangzhou.aliyuncs.com/ymm-maliang/resource/ymm_1572852703575.jpeg" width="360px">
 
 ### 也可以点个 Star
 开源项目需要的是持续地坚持，而我们坚持的动力当然也来自于你们的支持，希望你 :point_right: `来都来了，加个关注再走吧` :point_left:
