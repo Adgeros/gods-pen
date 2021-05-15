@@ -5,6 +5,13 @@
   <a href="https://godspen.ymm56.com/"><img src="https://img.shields.io/github/package-json/v/ymm-tech/gods-pen"></a>
 </p>
 
+ <p
+    style="
+color: red;
+font-size: 12px;
+"
+  >满帮大前端营销团队招人了，一起来做码良，一起玩转营销，目前组内加上我5个人 ，3个女生哟，团队氛围非常好，计划新增6人，欢迎技术强，有担当的兄弟姐妹加入，坐标南京 主要技术栈vue，有兴趣的可将简历发给到 kunming.wangkm@amh-group.com 。谢谢！</p>
+
 ## :house: 官网
 
   官网： https://godspen.ymm56.com/
@@ -85,7 +92,7 @@
 
 ## 组件动画展示
 运营活动对一些简单的动画提供支持，方便做一些入场和出场的动画，提升活动的交互感，我们使用了 Animate.css 提供的一套 CSS 动画。并提供逐帧设置预览，方便使用。下面提供简单的展示
-![](https://ymm-maliang.oss-cn-hangzhou.aliyuncs.com/ymm-maliang/resource/ymm_1577935881750.gif)
+![](https://ymm-maliang.oss-cn-hangzhou.aliyuncs.com/ymm-maliang/resource/ymm_1577935881750.gif?t=1)
 
 ## 合成组件展示
 合成组件就是选择已有的节点保存为一个通用的组件，方便下次直接使用
@@ -163,7 +170,7 @@ npm run client:build
 
 | 钉钉 | 微信  |
 | ------------- | ------------- |
-|<img src="https://ymm-maliang.oss-cn-hangzhou.aliyuncs.com/ymm-maliang/resource/ymm_1570850399387.JPG" width="350px"><div align="center"> 优先加钉钉群 </div>|<img src="https://godspen.oss-cn-shanghai.aliyuncs.com/godspen/qrcode/qrcode.jpeg?t=3" width="300px"><div align="center"> 如果上面微信二维码过期，[点击我查看最新二维码](https://godspen.oss-cn-shanghai.aliyuncs.com/godspen/qrcode/qrcode.jpeg) 添加的时候备注上 `码良` 我再邀请你进入群聊 </div>|
+|<img src="https://godspen.oss-cn-shanghai.aliyuncs.com/godspen/qrcode/WechatIMG40.jpeg" width="350px"><div align="center"> 优先加钉钉群 </div>|<img src="https://godspen.oss-cn-shanghai.aliyuncs.com/godspen/qrcode/qrcode.jpeg?t=3" width="300px"><div align="center"> 如果上面微信二维码过期，[点击我查看最新二维码](https://godspen.oss-cn-shanghai.aliyuncs.com/godspen/qrcode/qrcode.jpeg) 添加的时候备注上 `码良` 我再邀请你进入群聊 </div>|
 
 
 ## 支持我们
